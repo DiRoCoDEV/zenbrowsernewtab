@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>New Tab</title>
+    <link rel="icon" href="zen-browser-dark.svg" type="image/svg+xml">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #2e1065, #0f172a);
+            font-family: 'Inter', system-ui, sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+
+        .glass-container {
+            padding: 40px;
+            border-radius: 24px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            animation: fadeIn 0.8s ease-out;
+            position: relative;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 { margin-top: 0; font-weight: 300; opacity: 0.8; margin-bottom: 20px;}
+
+        input {
+            width: 100%;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255,255,255,0.05);
+            color: white;
+            font-size: 1.2rem;
+            outline: none;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        input:focus { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
+
+        #clock {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            font-size: 0.85rem;
+            opacity: 0.5;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="glass-container">
+        <h1 id="greeting">...</h1>
+        <form id="search-form">
+            <input type="text" name="q" id="search-input" placeholder="..." autofocus list="history-suggestions">
+            <datalist id="history-suggestions"></datalist>
+        </form>
+        <div id="clock">00:00</div>
+    </div>
+
+    <script>
+        // Diccionario de traducciones
+        const i18n = {
+            'af': { greeting: ["Goeie môre.", "Goeie middag.", "Goeie aand."], placeholder: "Soek of voer URL in..." },
+            'ar': { greeting: ["صباح الخير.", "مساء الخير.", "مساء النور."], placeholder: "ابحث أو أدخل رابطاً..." },
+            'az': { greeting: ["Sabahınız xeyir.", "Gün ortanız xeyir.", "Axşamınız xeyir."], placeholder: "URL-ni axtarın və ya daxil edin..." },
+            'bg': { greeting: ["Добро утро.", "Добър ден.", "Добър вечер."], placeholder: "Търсене или въвеждане на URL..." },
+            'bn': { greeting: ["শুভ সকাল।", "শুভ দুপুর۔", "শুভ সন্ধ্যা।"], placeholder: "ইউআরএল (URL) খুঁজুন বা লিখুন..." },
+            'bs': { greeting: ["Dobro jutro.", "Dobar dan.", "Dobro veče."], placeholder: "Pretražite ili unesite URL..." },
+            'ca': { greeting: ["Bon dia.", "Bona tarda.", "Bona nit."], placeholder: "Buscar o escriure un URL..." },
+            'cs': { greeting: ["Dobré ráno.", "Dobré odpoledne.", "Dobrý večer."], placeholder: "Hledat nebo zadat URL..." },
+            'cy': { greeting: ["Bore da.", "Prynhawn da.", "Nos da."], placeholder: "Chwilio neu nodi URL..." },
+            'da': { greeting: ["Godmorgen.", "God eftermiddag.", "God aften."], placeholder: "Søg eller indtast URL..." },
+            'de': { greeting: ["Guten Morgen.", "Guten Tag.", "Guten Abend."], placeholder: "Suchen oder URL eingeben..." },
+            'el': { greeting: ["Καλημέρα.", "Καλό απόγευμα.", "Καλησπέρα."], placeholder: "Αναζήτηση ή εισαγωγή URL..." },
+            'en': { greeting: ["Good morning.", "Good afternoon.", "Good evening."], placeholder: "Search or enter URL..." },
+            'es': { greeting: ["Buenos días.", "Buenas tardes.", "Buenas noches."], placeholder: "Buscar o escribir URL..." },
+            'et': { greeting: ["Tere hommikust.", "Tere päevast.", "Tere õhtust."], placeholder: "Otsige või sisestage URL..." },
+            'eu': { greeting: ["Egun on.", "Arratsalde on.", "Gabon."], placeholder: "Bilatu edo idatzi URLa..." },
+            'fa': { greeting: ["صبح بخیر.", "بعد از ظهر بخیر.", "عصر بخیر."], placeholder: "جستجو یا ورود URL..." },
+            'fi': { greeting: ["Hyvää huomenta.", "Hyvää iltapäivää.", "Hyvää iltaa."], placeholder: "Hae tai kirjoita URL..." },
+            'fr': { greeting: ["Bonjour.", "Bon après-midi.", "Bonsoir."], placeholder: "Rechercher ou entrer une URL..." },
+            'ga': { greeting: ["Maidin mhaith.", "Tráthnóna maith.", "Oíche mhaith."], placeholder: "Cuardaigh nó cuir isteach URL..." },
+            'gl': { greeting: ["Bos días.", "Boa tarde.", "Boa noite."], placeholder: "Buscar ou escribir URL..." },
+            'gu': { greeting: ["સુભ સવાર.", "શુભ બપોર.", "શુભ સાંજ."], placeholder: "શોધો અથવા URL દાખલ કરો..." },
+            'he': { greeting: ["בוקר טוב.", "צהריים טובים.", "ערב טוב."], placeholder: "חפש או הזן כתובת אתר..." },
+            'hi': { greeting: ["सुप्रभात।", "शुभ दोपहर।", "शुभ संध्या।"], placeholder: "खोजें या URL दर्ज करें..." },
+            'hr': { greeting: ["Dobro jutro.", "Dobar dan.", "Dobra večer."], placeholder: "Pretraži ili unesi URL..." },
+            'hu': { greeting: ["Jó reggelt.", "Jó napot.", "Jó estét."], placeholder: "Keresés vagy URL megadása..." },
+            'hy': { greeting: ["Բարի լույս.", "Բարի օր.", "Բարի երեկո."], placeholder: "Փնտրեք կամ մուտքագրեք URL..." },
+            'id': { greeting: ["Selamat pagi.", "Selamat siang.", "Selamat malam."], placeholder: "Cari atau masukkan URL..." },
+            'is': { greeting: ["Góðan daginn.", "Góðan daginn.", "Gott kvöld."], placeholder: "Leitaðu eða sláðu inn vefslóð..." },
+            'it': { greeting: ["Buongiorno.", "Buon pomeriggio.", "Buonasera."], placeholder: "Cerca o inserisci URL..." },
+            'ja': { greeting: ["おはようございます。", "こんにちは。", "こんばんは。"], placeholder: "検索またはURLを入力..." },
+            'ka': { greeting: ["დილა მშვიდობისა.", "შუადღე მშვიდობისა.", "ਸაღამო მშვიდობისა."], placeholder: "მოძებნეთ ან შეიყვანეთ URL..." },
+            'kk': { greeting: ["Қайырлы таң.", "Қайырлы күн.", "Қайырлы кеш."], placeholder: "URL мекенжайын іздеңіз немесе енгізіңіз..." },
+            'ko': { greeting: ["좋은 아침입니다.", "좋은 오후입니다.", "좋은 저녁입니다."], placeholder: "검색 또는 URL 입력..." },
+            'lt': { greeting: ["Labas rytas.", "Laba diena.", "Labas vakaras."], placeholder: "Ieškoti arba įvesti URL..." },
+            'lv': { greeting: ["Labrīt.", "Labdien.", "Labvakar."], placeholder: "Meklēt vai ievadīt URL..." },
+            'mk': { greeting: ["Добро утро.", "Добар ден.", "Добро вечер."], placeholder: "Пребарајте или внесете URL..." },
+            'ml': { greeting: ["സുപ്രഭാതം.", "ഉച്ചതിരിഞ്ഞ് ആശംസകൾ.", "శుభसंध്യ।"], placeholder: "URL തിരയുക അല്ലെങ്കിൽ നൽകുക..." },
+            'mr': { greeting: ["सुप्रभात.", "शुभ दुपार.", "शुभ संध्याकाळ."], placeholder: "शोधा किंवा URL प्रविष्ट करा..." },
+            'ms': { greeting: ["Selamat pagi.", "Selamat petang.", "Selamat malam."], placeholder: "Cari atau masukkan URL..." },
+            'nl': { greeting: ["Goedemorgen.", "Goedemiddag.", "Goedenavond."], placeholder: "Zoeken of URL invoeren..." },
+            'no': { greeting: ["God morgen.", "God ettermiddag.", "God kveld."], placeholder: "Søk eller skriv inn URL..." },
+            'pl': { greeting: ["Dzień dobry.", "Dzień dobry.", "Dobry wieczór."], placeholder: "Szukaj lub wpisz URL..." },
+            'pt': { greeting: ["Bom dia.", "Boa tarde.", "Boa noite."], placeholder: "Pesquisar ou inserir URL..." },
+            'ro': { greeting: ["Bună dimineața.", "Bună ziua.", "Bună seara."], placeholder: "Căutați sau introduceți adresa URL..." },
+            'ru': { greeting: ["Доброе утро.", "Добрый день.", "Добрый вечер."], placeholder: "Поиск или URL..." },
+            'sk': { greeting: ["Dobré ráno.", "Dobrý deň.", "Dobrý večer."], placeholder: "Hľadať alebo zadať URL..." },
+            'sl': { greeting: ["Dobro jutro.", "Dober dan.", "Dober večer."], placeholder: "Iskanje ali vnos URL-ja..." },
+            'sq': { greeting: ["Mirëmengjes.", "Mirëdita.", "Mirëbrëma."], placeholder: "Kërko ose fut URL-në..." },
+            'sr': { greeting: ["Добро јутро.", "Добар дан.", "Добро вече."], placeholder: "Претражите или унесите УРЛ..." },
+            'sv': { greeting: ["God morgon.", "God dag.", "God kväll."], placeholder: "Sök eller ange URL..." },
+            'sw': { greeting: ["Habari za asubuhi.", "Habari za mchana.", "Habari za jioni."], placeholder: "Tafuta au weka URL..." },
+            'ta': { greeting: ["காலை வணக்கம்.", "மதிய வணக்கம்.", "மாலை வணக்கம்."], placeholder: "URL-ஐத் தேடவும் அல்லது உள்ளிடவும்..." },
+            'te': { greeting: ["శుభోదయం.", "మధ్యాహ్న శుభాకాంక్షలు.", "శుభ సాయంత్రం."], placeholder: "URLని శోధించండి లేదా నమోదు చేయండి..." },
+            'th': { greeting: ["สวัสดีตอนเช้า", "สวัสดีตอนบ่าย", "สวัสดีตอนเย็น"], placeholder: "ค้นหาหรือป้อน URL..." },
+            'tl': { greeting: ["Magandang umaga.", "Magandang hapon.", "Magandang gabi."], placeholder: "Maghanap o maglagay ng URL..." },
+            'tr': { greeting: ["Günaydın.", "İyi günler.", "İyi akşamlar."], placeholder: "Ara veya URL gir..." },
+            'uk': { greeting: ["Доброго ранку.", "Доброго дня.", "Доброго вечора."], placeholder: "Пошук або введення URL-адреси..." },
+            'vi': { greeting: ["Chào buổi sáng.", "Chào buổi chiều.", "Chào buổi tối."], placeholder: "Tìm kiếm hoặc nhập URL..." },
+            'zh': { greeting: ["早上好。", "下午好。", "晚上好。"], placeholder: "搜索或输入网址..." }
+        };
+
+        // Detectar idioma
+        const lang = navigator.language.split('-')[0];
+        const t = i18n[lang] || i18n['en'];
+
+        // 1. Saludo inteligente
+        const hour = new Date().getHours();
+        const greetingIndex = hour < 12 ? 0 : hour < 19 ? 1 : 2;
+        document.getElementById('greeting').innerText = t.greeting[greetingIndex];
+        document.getElementById('search-input').placeholder = t.placeholder;
+
+        // 2. Reloj en tiempo real (formato 24h)
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('es-ES', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                hour12: false 
+            });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // 3. Lógica de búsqueda y historial
+        const form = document.getElementById('search-form');
+        const input = document.getElementById('search-input');
+        const historyList = document.getElementById('history-suggestions');
+
+        const getHistory = () => JSON.parse(localStorage.getItem('zen_history') || '[]');
+        
+        function updateDatalist() {
+            const history = getHistory();
+            historyList.innerHTML = history.map(item => `<option value="${item}">`).join('');
+        }
+        updateDatalist();
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            let query = input.value.trim();
+            if (!query) return;
+
+            let history = getHistory();
+            if (!history.includes(query)) {
+                history.unshift(query);
+                localStorage.setItem('zen_history', JSON.stringify(history.slice(0, 10)));
+            }
+
+            if ((query.includes('.') && !query.includes(' ')) || query.startsWith('http')) {
+                window.location.href = query.startsWith('http') ? query : 'https://' + query;
+            } else {
+                window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+            }
+        });
+    </script>
+</body>
+</html>
