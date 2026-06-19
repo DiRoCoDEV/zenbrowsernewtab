@@ -196,6 +196,21 @@
                 window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
             }
         });
+
+        // Always focus search input
+        const focusInput = document.getElementById('search-input');
+
+        window.addEventListener('focus', () => {
+            focusInput.focus();
+        });
+
+        document.addEventListener('click', () => {
+            focusInput.focus();
+        });
+
+        document.addEventListener('keydown', () => {
+            focusInput.focus();
+        });
     </script>
 </body>
 </html>
